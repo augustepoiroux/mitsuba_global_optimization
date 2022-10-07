@@ -12,9 +12,9 @@ def plot_loss_linear_interp_1d(
     params_2,
     reset_scene_func,
     loss_fn=rel_l1_loss,
-    n_samples=100,
+    n_samples=50,
     title=None,
-    spp=8,
+    spp=32,
 ):
     alphas = np.linspace(0, 1, n_samples)
     losses = []
@@ -39,9 +39,9 @@ def plot_loss_bilinear_interp_2d(
     params_4,
     reset_scene_func,
     loss_fn=rel_l1_loss,
-    n_samples=10,
+    n_samples=7,
     title=None,
-    spp=8,
+    spp=32,
 ):
     alphas = np.linspace(0, 1, n_samples)
     losses = np.zeros((n_samples, n_samples))
@@ -127,3 +127,13 @@ def contour_plot_2d(
     plt.ylabel("dir2")
     plt.contourf(alphas, alphas, losses)
     plt.colorbar()
+
+
+def plot_losses(losses, baseline=None):
+    plt.figure()
+    for loss in losses:
+        plt.semilogy(loss)
+    if baseline is not None:
+        plt.semilogy(baseline * np.ones(len(losses[0])))
+    plt.title("Loss convergence", weight="bold", size=14)
+    plt.show()

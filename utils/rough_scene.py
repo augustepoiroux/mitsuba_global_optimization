@@ -1,11 +1,12 @@
+import os
 from enum import Enum
 
+import drjit as dr
 import matplotlib.pyplot as plt
 import mitsuba as mi
 import numpy as np
 
-import os
-
+from utils.utils import image_to_bm, rel_l1_loss, unidim_to_bm
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -29,6 +30,9 @@ def reset_scene(scene: Scene):
             ROOT_DIR, f"scenes/roughness_optimization_{scene.value}.xml"
         )
     )
+
+
+reset_func = {_k: (lambda _k=_k: reset_scene(_k)) for _k in Scene}
 
 
 def plot_rough_envlight(
@@ -124,3 +128,133 @@ def get_full_ones_params():
     rough_values = mi.TensorXf(np.ones((512, 512, 1)))
     envlight_values = mi.TensorXf(np.ones((256, 513, 4)))
     return {ROUGH_KEY: rough_values, ENVLIGHT_KEY: envlight_values}
+
+
+def run_opt_set_init(
+    img_ref,
+    init_values,
+    reset_scene_func,
+    optimizer_name="sgd",
+    lr=120.0,
+    loss_fn=rel_l1_loss,
+    n_iterations=100,
+    spp_primal=32,
+    spp_grad=4,
+):
+    losses = []
+    image_bm_init = []
+    image_bm_end = []
+    tex_bm_init = []
+    tex_bm_end = []
+    envlight_bm_init = []
+    envlight_bm_end = []
+    params_end = []
+
+    nb_opt_samples = len(init_values)
+
+    for (opt_sample, dict_init_values) in enumerate(init_values):
+        # Load scene
+        scene = reset_scene_func()
+
+        params = mi.traverse(scene)
+        params[ROUGH_KEY] = dict_init_values[ROUGH_KEY]
+        params[ENVLIGHT_KEY] = dict_init_values[ENVLIGHT_KEY]
+        params.update()
+
+        # Standard stochastic gradient descent optimizer
+        if optimizer_name.lower() == "sgd":
+            opt = mi.ad.optimizers.SGD(lr=lr)
+        elif optimizer_name.lower() == "adam":
+            opt = mi.ad.optimizers.Adam(lr=lr)
+        else:
+            raise ValueError(f"Unknown optimizer {optimizer_name}")
+
+        opt[ROUGH_KEY] = params[ROUGH_KEY]
+        opt[ENVLIGHT_KEY] = params[ENVLIGHT_KEY]
+        params.update(opt)
+
+        losses.append([])
+        for it in range(n_iterations):
+            image = mi.render(
+                scene,
+                params,
+                seed=it * nb_opt_samples + opt_sample,
+                spp=spp_primal,
+                spp_grad=spp_grad,
+            )
+
+            if it == 0:
+                image_bm_init.append(image_to_bm(image))
+                tex_bm_init.append(unidim_to_bm(params[ROUGH_KEY]))
+                envlight_bm_init.append(image_to_bm(params[ENVLIGHT_KEY]))
+
+            # Apply loss function
+            loss = loss_fn(image, img_ref)
+
+            # Backpropagate
+            dr.backward(loss)
+
+            # Optimizer: take a gradient step
+            opt.step()
+            opt[ROUGH_KEY] = dr.clamp(opt[ROUGH_KEY], 1e-2, 1.0)
+            opt[ENVLIGHT_KEY] = dr.clamp(opt[ENVLIGHT_KEY], 0.0, 1.0)
+
+            # Optimizer: Update the scene parameters
+            params.update(opt)
+
+            if it == n_iterations - 1:
+                image_bm_end.append(image_to_bm(image))
+                tex_bm_end.append(unidim_to_bm(params[ROUGH_KEY]))
+                envlight_bm_end.append(image_to_bm(params[ENVLIGHT_KEY]))
+                params_end.append(
+                    {
+                        ROUGH_KEY: mi.TensorXf(params[ROUGH_KEY]),
+                        ENVLIGHT_KEY: params[ENVLIGHT_KEY],
+                    }
+                )
+
+            print(
+                f"[Sample {opt_sample+1}/{nb_opt_samples}]  Iteration {it:03d}: loss={loss[0]:.5f}",
+                end="\r",
+            )
+            losses[opt_sample].append(loss)
+    return {
+        "losses": losses,
+        "image_bm_init": image_bm_init,
+        "image_bm_end": image_bm_end,
+        "tex_bm_init": tex_bm_init,
+        "tex_bm_end": tex_bm_end,
+        "envlight_bm_init": envlight_bm_init,
+        "envlight_bm_end": envlight_bm_end,
+        "params_end": params_end,
+    }
+
+
+def plot_opt_results(results, refs, nb_results=2, size_factor=3):
+    titles = (
+        [f"Initial {i}" for i in range(nb_results)]
+        + [f"Final {i}" for i in range(nb_results)]
+        + ["Reference"]
+    )
+    images_bm = (
+        [results["image_bm_init"][i] for i in range(nb_results)]
+        + [results["image_bm_end"][i] for i in range(nb_results)]
+        + [refs["img"]]
+    )
+    textures_bm = (
+        [results["tex_bm_init"][i] for i in range(nb_results)]
+        + [results["tex_bm_end"][i] for i in range(nb_results)]
+        + [refs["params_rough"]]
+    )
+    envlights_bm = (
+        [results["envlight_bm_init"][i] for i in range(nb_results)]
+        + [results["envlight_bm_end"][i] for i in range(nb_results)]
+        + [refs["params_envlight"]]
+    )
+    plot_rough_envlight2(
+        {
+            titles[i]: (images_bm[i], textures_bm[i], envlights_bm[i])
+            for i in range(len(titles))
+        },
+        size_factor=size_factor,
+    )
