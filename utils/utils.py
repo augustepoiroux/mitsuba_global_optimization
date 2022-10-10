@@ -38,3 +38,5 @@ def rel_l1_loss(img, img_ref):
 
 def mse(img, img_ref):
     return dr.mean(dr.sqr(img - img_ref))
+
+LOSS_FNS = {"Relative L1": rel_l1_loss, "MSE": mse}
