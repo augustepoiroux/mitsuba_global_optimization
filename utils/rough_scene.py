@@ -47,6 +47,7 @@ def plot_rough_envlight(
     for i, (img, tex, envlight, title) in enumerate(
         zip(images_bm, rough_bm, envlight_bm, titles)
     ):
+        # TODO set vmin vmax
         ax[i, 0].imshow(img)
         ax[i, 1].imshow(tex)
         ax[i, 2].imshow(envlight)
@@ -90,6 +91,14 @@ def generate_rand_rough_tex(
     # Upsample texture to full resolution
     return mi.TensorXf(
         np.array(initial_values.resample([opt_res, opt_res], TENT_RFILTER))[
+            ..., np.newaxis
+        ]
+    )
+
+
+def upsample(x, final_res):
+    return mi.TensorXf(
+        np.array(x.resample([final_res, final_res], TENT_RFILTER))[
             ..., np.newaxis
         ]
     )
