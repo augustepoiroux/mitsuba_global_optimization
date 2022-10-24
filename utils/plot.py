@@ -69,7 +69,7 @@ def plot_loss_bilinear_interp_2d(
             for key in loss_fns.keys():
                 losses[key][i, j] = to_float(loss_fns[key](image, img_ref))
 
-    fig, axs = plt.subplots(1, len(losses), figsize=(len(losses)*5, 5))
+    fig, axs = plt.subplots(1, len(losses), figsize=(len(losses) * 5, 5))
     for i, key in enumerate(losses.keys()):
         axs[i].contourf(alphas, alphas, losses[key])
         axs[i].set_title(key)

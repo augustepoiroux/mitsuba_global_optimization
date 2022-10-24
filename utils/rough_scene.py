@@ -47,10 +47,9 @@ def plot_rough_envlight(
     for i, (img, tex, envlight, title) in enumerate(
         zip(images_bm, rough_bm, envlight_bm, titles)
     ):
-        # TODO set vmin vmax
-        ax[i, 0].imshow(img)
-        ax[i, 1].imshow(tex)
-        ax[i, 2].imshow(envlight)
+        ax[i, 0].imshow(img, vmin=0, vmax=1)
+        ax[i, 1].imshow(tex, vmin=0, vmax=1)
+        ax[i, 2].imshow(envlight, vmin=0, vmax=1)
         ax[i, 0].set_ylabel(title, size=14)
         ax[i, 0].set_xticks([])
         ax[i, 0].set_yticks([])
@@ -74,6 +73,14 @@ def plot_rough_envlight2(res_dict, size_factor=3):
         images_bm, textures_bm, envlights_bm, titles, size_factor
     )
 
+def upsample(x, final_res):
+    if not isinstance(x, mi.Bitmap):
+        x = mi.Bitmap(x)
+    return mi.TensorXf(
+        np.array(x.resample([final_res, final_res], TENT_RFILTER))[
+            ..., np.newaxis
+        ]
+    )
 
 def generate_rand_rough_tex(
     scene_name: Scene, seed=0, init_res=32, opt_res=512
@@ -96,12 +103,6 @@ def generate_rand_rough_tex(
     )
 
 
-def upsample(x, final_res):
-    return mi.TensorXf(
-        np.array(x.resample([final_res, final_res], TENT_RFILTER))[
-            ..., np.newaxis
-        ]
-    )
 
 
 def generate_rand_envlight(scene_name: Scene, seed=0, init_res=32):
@@ -121,9 +122,9 @@ def generate_rand_envlight(scene_name: Scene, seed=0, init_res=32):
     )
 
 
-def generate_rand_init_values(scene_name: Scene, seed=0):
-    rough_values = generate_rand_rough_tex(scene_name, seed)
-    envlight_values = generate_rand_envlight(scene_name, seed)
+def generate_rand_init_values(scene_name: Scene, seed=0, init_res=32):
+    rough_values = generate_rand_rough_tex(scene_name, seed, init_res)
+    envlight_values = generate_rand_envlight(scene_name, seed, init_res)
     return {ROUGH_KEY: rough_values, ENVLIGHT_KEY: envlight_values}
 
 
