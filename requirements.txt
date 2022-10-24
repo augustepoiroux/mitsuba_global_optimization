@@ -1,0 +1,5 @@
+drjit==0.2.2
+matplotlib==3.6.1
+mitsuba==3.0.2
+numpy==1.21.5
+pymoo==0.6.0
