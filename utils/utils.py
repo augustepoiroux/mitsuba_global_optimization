@@ -4,6 +4,10 @@ import drjit as dr
 import mitsuba as mi
 import numpy as np
 
+mi.set_variant("scalar_rgb")
+TENT_RFILTER = mi.load_dict({"type": "tent"})
+mi.set_variant("cuda_ad_rgb")
+
 
 def subdict(d, ks):
     vals = []
@@ -39,4 +43,43 @@ def rel_l1_loss(img, img_ref):
 def mse(img, img_ref):
     return dr.mean(dr.sqr(img - img_ref))
 
+
 LOSS_FNS = {"Relative L1": rel_l1_loss, "MSE": mse}
+
+
+def upsample(x, final_res):
+    if isinstance(final_res, int):
+        final_res = (final_res, final_res)
+
+    if not isinstance(x, mi.Bitmap):
+        x = mi.Bitmap(x)
+
+    res = mi.TensorXf(
+        np.array(x.resample([final_res[0], final_res[1]], TENT_RFILTER))
+    )
+    if x.channel_count() == 1:
+        res = res[..., np.newaxis]
+    return res
+
+
+def generate_rand_tex(
+    init_res=(32, 32), opt_res=(512, 512), n_channels=1, seed=0
+):
+    if isinstance(init_res, int):
+        init_res = (init_res, init_res)
+    if isinstance(opt_res, int):
+        opt_res = (opt_res, opt_res)
+    np.random.seed(seed)
+    initial_values = mi.Bitmap(
+        np.random.uniform(size=(init_res[0], init_res[1], n_channels))
+    )
+
+    # Upsample texture to full resolution
+    res = mi.TensorXf(
+        np.array(
+            initial_values.resample([opt_res[0], opt_res[1]], TENT_RFILTER)
+        )
+    )
+    if n_channels == 1:
+        res = res[..., np.newaxis]
+    return res

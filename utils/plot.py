@@ -151,13 +151,17 @@ def contour_plot_2d(
     plt.show()
 
 
-def plot_losses(losses, baseline=None, title=None):
+def plot_losses(losses, baseline=None, title=None, labels=True):
     plt.figure()
     if title is None:
         title = "Loss convergence"
     plt.title(title, weight="bold", size=14)
-    for loss in losses:
-        plt.semilogy(loss)
+    for i, loss in enumerate(losses):
+        if labels:
+            plt.semilogy(loss, label=f"{i+1}")
+        else:
+            plt.semilogy(loss)
     if baseline is not None:
         plt.axhline(y=baseline, color="r", linestyle="-")
+    plt.legend()
     plt.show()
