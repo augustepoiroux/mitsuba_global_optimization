@@ -1,0 +1,61 @@
+<scene version="3.0.0">
+    <default name="spp" value="128" />
+    <default name="res" value="256" />
+    <default name="max_depth" value="6" />
+    <default name="integrator" value="path" />
+
+    <integrator type='$integrator'>
+        <integer name="max_depth" value="$max_depth" />
+        <boolean name="hide_emitters" value="true" />
+    </integrator>
+
+    <sensor type="perspective" id="sensor">
+        <string name="fov_axis" value="smaller" />
+        <float name="near_clip" value="0.001" />
+        <float name="far_clip" value="100.0" />
+        <float name="focus_distance" value="1000" />
+        <float name="fov" value="39.3077" />
+        <transform name="to_world">
+            <lookat origin="0,  0,  4"
+                target="0,  0,  0"
+                up="0,  1,  0" />
+        </transform>
+        <sampler type="independent">
+            <integer name="sample_count" value="$spp" />
+        </sampler>
+        <film type="hdrfilm">
+            <integer name="width" value="$res" />
+            <integer name="height" value="$res" />
+            <rfilter type="tent" />
+            <string name="pixel_format" value="rgb" />
+            <string name="component_format" value="float32" />
+        </film>
+    </sensor>
+
+    <texture type="bitmap" id="cow_tex">
+        <string name="filename" value="spot/spot_texture.png" />
+    </texture>
+
+    <shape type="obj" id="cow">
+        <string name="filename" value="spot/spot_control_mesh.obj" />
+
+        <boolean name="face_normals" value="true" />
+
+        <bsdf type="diffuse" id="white">
+            <ref name="reflectance" id="cow_tex" />
+        </bsdf>
+
+        <transform name="to_world">
+            <scale x="1" y="1" z="1" />
+            <rotate y="1" angle="130" />
+            <translate z="-0.1" />
+        </transform>
+    </shape>
+
+    <emitter type="envmap" id="emitter">
+        <string name="filename" value="textures/envmap.exr" />
+        <transform name="to_world">
+            <rotate y="1" angle="-10" />
+        </transform>
+    </emitter>
+</scene>
