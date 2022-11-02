@@ -73,6 +73,7 @@ def plot_rough_envlight2(res_dict, size_factor=3):
         images_bm, textures_bm, envlights_bm, titles, size_factor
     )
 
+
 def upsample(x, final_res):
     if not isinstance(x, mi.Bitmap):
         x = mi.Bitmap(x)
@@ -81,6 +82,7 @@ def upsample(x, final_res):
             ..., np.newaxis
         ]
     )
+
 
 def generate_rand_rough_tex(
     scene_name: Scene, seed=0, init_res=32, opt_res=512
@@ -101,8 +103,6 @@ def generate_rand_rough_tex(
             ..., np.newaxis
         ]
     )
-
-
 
 
 def generate_rand_envlight(scene_name: Scene, seed=0, init_res=32):
@@ -150,6 +150,7 @@ def run_opt_set_init(
     n_iterations=100,
     spp_primal=32,
     spp_grad=4,
+    spp_test=None,
 ):
     losses = []
     image_bm_init = []
@@ -223,11 +224,23 @@ def run_opt_set_init(
                     }
                 )
 
+            if spp_test is not None:
+                with dr.suspend_grad():
+                    image_test = mi.render(
+                        scene,
+                        params,
+                        seed=it * nb_opt_samples + opt_sample,
+                        spp=spp_test,
+                    )
+                losses[-1].append(loss_fn(image_test, img_ref))
+            else:
+                losses[-1].append(loss)
+
             print(
-                f"[Sample {opt_sample+1}/{nb_opt_samples}]  Iteration {it:03d}: loss={loss[0]:.5f}",
+                f"[Sample {opt_sample+1}/{nb_opt_samples}]"
+                f"  Iteration {it:03d}: loss={losses[-1][-1][0]:.5f}",
                 end="\r",
             )
-            losses[opt_sample].append(loss)
     return {
         "losses": losses,
         "image_bm_init": image_bm_init,
