@@ -33,6 +33,24 @@ WIP:
 
 TODO:
 
+- parallélisation
+
+- optimisations avec sphères
+- double caustiques
+- tester différents algorithmes d'optimisation globale
+- différentes stratégies pour le nombre d'itérations pour la descente de gradient
+- exemple papier wasserstein
+- exemples avec différents nombres de dimension (ordres de grandeur)
+  - tableaux avec les algorithmes qui marchent bien par ordre de grandeur de dimension
+- exemples avec différentes tailles d'images
+
+- montrer des baselines
+
+  - gradient descent + plusieurs points aléatoires
+  - random search
+
+- ambiguités de certain problème -> nombreux minimums locaux
+
 - scène avec caustiques
 - utiliser la vache la vraie
 - multiview avec envmap à optimiser
@@ -47,23 +65,6 @@ TODO:
     - par texel
     - déterminer les raisons de ces minimums locaux
 - upscale la taille du rendu durant l'optimisation
-
-- optimisations avec sphères
-- double caustiques
-- tester différents algorithmes d'optimisation globale
-- différentes stratégies pour le nombre d'itérations pour la descente de gradient
-- exemple papier wasserstein
-- exemples avec différents nombres de dimension (ordres de grandeur)
-  - tableaux avec les algorithmes qui marchent bien par ordre de grandeur de dimension
-- exemples avec différentes tailles d'images
-- setup CI
-
-- montrer des baselines
-
-  - gradient descent + plusieurs points aléatoires
-  - random search
-
-- ambiguités de certain problème -> nombreux minimums locaux
 
 Unrelated:
 
