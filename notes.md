@@ -30,15 +30,16 @@ WIP:
 - optimiser une sdf (+ robuste que des meshs à optimiser)
 - optimisation globale
 - littérature sur les optimisations pour inverse rendering
+- tester différents algorithmes d'optimisation globale
+- différentes stratégies pour le nombre d'itérations pour la descente de gradient
+- BO-leap: line 17 of pseudo-code is not clear
 
 TODO:
 
 - parallélisation
-
+-mettre des couleurs aux lapins
 - optimisations avec sphères
 - double caustiques
-- tester différents algorithmes d'optimisation globale
-- différentes stratégies pour le nombre d'itérations pour la descente de gradient
 - exemple papier wasserstein
 - exemples avec différents nombres de dimension (ordres de grandeur)
   - tableaux avec les algorithmes qui marchent bien par ordre de grandeur de dimension

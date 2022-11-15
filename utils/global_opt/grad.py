@@ -1,5 +1,3 @@
-from abc import ABC, abstractmethod
-
 import drjit as dr
 import mitsuba as mi
 import numpy as np
@@ -10,79 +8,18 @@ from pymoo.core.duplicate import (
 )
 from pymoo.core.evaluator import Evaluator
 from pymoo.core.initialization import Initialization
-from pymoo.core.problem import Problem
 from pymoo.core.termination import NoTermination
 from pymoo.problems.static import StaticProblem
 from tqdm import tqdm
 
-from .utils import image_to_bm, to_float
+from ..problem import MitsubaProblem
+from ..utils import to_float
+from .utils import StoppingCriteria
 
 
-class StoppingCriteria(ABC):
-    @abstractmethod
-    def __call__(self, loss: float) -> bool:
-        pass
-
-
-class IterationStoppingCriteria(StoppingCriteria):
-    def __init__(self, max_iter: int):
-        self.max_iter = max_iter
-        self.iter = 0
-
-    def __call__(self, loss: float) -> bool:
-        self.iter += 1
-        return self.iter >= self.max_iter
-
-
-class NotImprovingStoppingCriteria(StoppingCriteria):
-    def __init__(self, max_iter: int, eps: float = 0.0):
-        self.max_iter = max_iter
-        self.eps = eps
-        self.iter = 0
-        self.best_loss = None
-
-    def __call__(self, loss: float) -> bool:
-        if self.best_loss is None:
-            self.best_loss = loss
-            return False
-
-        self.best_loss = min(self.best_loss, loss)
-
-        if loss - self.best_loss > self.eps:
-            self.iter += 1
-        else:
-            self.iter = 0
-
-        return self.iter >= self.max_iter
-
-
-class GlobalOptGrad(ABC):
-    def __init__(self, n_var, xl, xu):
-        self.problem = Problem(n_var=n_var, n_obj=1, xl=xl, xu=xu)
-
-    @abstractmethod
-    def set_params_from_vector(self, params, vector):
-        raise NotImplementedError
-
-    @abstractmethod
-    def set_vector_from_params(self, params, vector):
-        raise NotImplementedError
-
-    @abstractmethod
-    def apply_transformations(self, scene_params, params):
-        raise NotImplementedError
-
-    @abstractmethod
-    def initialize_scene(self):
-        raise NotImplementedError
-
-    def render_individual(self, x, spp, seed=0) -> mi.Bitmap:
-        scene, params = self.initialize_scene()
-        opt = {}
-        self.set_params_from_vector(opt, x)
-        self.apply_transformations(params, opt)
-        image = mi.render(scene, params, seed=seed, spp=spp)
-        return image_to_bm(image)
+class GlobalOptGrad:
+    def __init__(self, problem: MitsubaProblem):
+        self.mi_problem = problem
 
     def run(
         self,
@@ -92,12 +29,13 @@ class GlobalOptGrad(ABC):
         grad_descent_stopping_criteria: StoppingCriteria,
         lr,
         spp,
+        use_grad_opt_as_fitness_measure_only=False,
         seed=0,
         verbose=False,
     ):
         # prepare the algorithm to solve the problem
         algorithm.setup(
-            self.problem,
+            self.mi_problem.problem,
             termination=NoTermination(),
             seed=seed,
             verbose=False,
@@ -120,8 +58,8 @@ class GlobalOptGrad(ABC):
                 vector = ind.get("X")
 
                 opt = mi.ad.Adam(lr=lr)
-                self.set_params_from_vector(opt, vector)
-                scene, params = self.initialize_scene()
+                self.mi_problem.set_params_from_vector(opt, vector)
+                scene, params = self.mi_problem.initialize_scene()
 
                 # optimize the individual using gradient descent
                 it = 0
@@ -132,7 +70,7 @@ class GlobalOptGrad(ABC):
                         f"\tBest loss: {best_loss:.6f}"
                         f"\tNb renderings: {nb_renders}"
                     )
-                    self.apply_transformations(params, opt)
+                    self.mi_problem.apply_transformations(params, opt)
                     img = mi.render(
                         scene,
                         params,
@@ -154,7 +92,7 @@ class GlobalOptGrad(ABC):
                     f"\tBest loss: {best_loss:.6f}"
                     f"\tNb renderings: {nb_renders}"
                 )
-                self.apply_transformations(params, opt)
+                self.mi_problem.apply_transformations(params, opt)
                 final_img = mi.render(
                     scene,
                     params,
@@ -166,11 +104,12 @@ class GlobalOptGrad(ABC):
                 best_loss = min(best_loss, loss)
                 F[i, 0] = loss
 
-                self.set_vector_from_params(opt, vector)
-                ind.set("X", vector)
+                if not use_grad_opt_as_fitness_measure_only:
+                    self.mi_problem.set_vector_from_params(opt, vector)
+                    ind.set("X", vector)
 
             # store the objective function value
-            static = StaticProblem(self.problem, F=F)
+            static = StaticProblem(self.mi_problem.problem, F=F)
             Evaluator().eval(static, pop)
             losses.append(F)
 
