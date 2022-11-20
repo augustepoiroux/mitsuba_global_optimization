@@ -1,3 +1,5 @@
+import os
+
 import drjit as dr
 import mitsuba as mi
 import numpy as np
@@ -6,13 +8,18 @@ from mitsuba.scalar_rgb import Transform4f as T
 from ..problem import MitsubaProblem
 from ..utils import to_float
 
+ROOT_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 
 class BunniesProblem(MitsubaProblem):
-    def __init__(self, nb_bunnies=1, colored=False):
+    def __init__(self, nb_bunnies=1, colored=False, scene_seed=0):
         super().__init__(n_var=3 * nb_bunnies, xl=-1.0, xu=1.0)
         self.nb_bunnies = nb_bunnies
         self.colored = colored
-        scene, params = self.initialize_scene()
+        self.scene_seed = scene_seed
+        _, params = self.initialize_scene()
         self.initial_vertex_positions = [
             dr.unravel(mi.Point3f, params[f"bunny{i}.vertex_positions"])
             for i in range(self.nb_bunnies)
@@ -31,7 +38,7 @@ class BunniesProblem(MitsubaProblem):
 
     def apply_transformations(self, scene_params, params):
         for i in range(self.nb_bunnies):
-            params[f"trans{i}"] = dr.clamp(params[f"trans{i}"], -0.5, 0.5)
+            params[f"trans{i}"] = dr.clamp(params[f"trans{i}"], -1.0, 1.0)
             params[f"angle{i}"] = dr.clamp(params[f"angle{i}"], -1.0, 1.0)
             trafo = mi.Transform4f.translate(
                 [params[f"trans{i}"].x, params[f"trans{i}"].y, 0.0]
@@ -41,15 +48,12 @@ class BunniesProblem(MitsubaProblem):
             )
         scene_params.update()
 
-    def initialize_scene(self, seed=0):
-        scene = self.reset_scene(seed)
+    def initialize_scene(self):
+        scene = self.reset_scene()
         params = mi.traverse(scene)
         return scene, params
 
-    def reset_scene(self, seed=0):
-        # set numpy seed
-        np.random.seed(seed)
-
+    def reset_scene(self):
         scene_dict = {
             "type": "scene",
             "integrator": {
@@ -63,15 +67,15 @@ class BunniesProblem(MitsubaProblem):
                 "fov": 60,
                 "film": {
                     "type": "hdrfilm",
-                    "width": 64,
-                    "height": 64,
+                    "width": 256,
+                    "height": 256,
                     "rfilter": {"type": "gaussian"},
                     "sample_border": True,
                 },
             },
             "wall": {
                 "type": "obj",
-                "filename": "../scenes/meshes/rectangle.obj",
+                "filename": f"{ROOT_DIR}/scenes/meshes/rectangle.obj",
                 "to_world": T.translate([0, 0, -2]).scale(2.0),
                 "face_normals": True,
                 "bsdf": {
@@ -81,7 +85,7 @@ class BunniesProblem(MitsubaProblem):
             },
             "light": {
                 "type": "obj",
-                "filename": "../scenes/meshes/sphere.obj",
+                "filename": f"{ROOT_DIR}/scenes/meshes/sphere.obj",
                 "emitter": {
                     "type": "area",
                     "radiance": {"type": "rgb", "value": [1e3, 1e3, 1e3]},
@@ -90,24 +94,38 @@ class BunniesProblem(MitsubaProblem):
             },
         }
 
-        for i in range(self.nb_bunnies):
-            pos_x = np.random.uniform(-1.0, 1.0)
-            pos_y = np.random.uniform(-1.0, 1.0)
-            rot = np.random.uniform(0.0, 360.0)
-            if self.colored:
-                color = tuple(np.random.uniform(0.0, 1.0, size=3))
-            else:
-                color = (0.3, 0.3, 0.75)
-            scene_dict[f"bunny{i}"] = {
+        if self.nb_bunnies == 1:
+            scene_dict["bunny0"] = {
                 "type": "ply",
-                "filename": "../scenes/meshes/bunny.ply",
-                "to_world": T.translate([pos_x, pos_y, 0])
-                .rotate([0, 1, 0], rot)
-                .scale(5.0 / np.sqrt(self.nb_bunnies)),
+                "filename": f"{ROOT_DIR}/scenes/meshes/bunny.ply",
+                "to_world": T.scale(6.5),
                 "bsdf": {
                     "type": "diffuse",
-                    "reflectance": {"type": "rgb", "value": color},
+                    "reflectance": {"type": "rgb", "value": (0.3, 0.3, 0.75)},
                 },
             }
+        else:
+            # set numpy seed
+            np.random.seed(self.scene_seed)
+
+            for i in range(self.nb_bunnies):
+                pos_x = np.random.uniform(-1.0, 1.0)
+                pos_y = np.random.uniform(-1.0, 1.0)
+                rot = np.random.uniform(0.0, 360.0)
+                if self.colored:
+                    color = tuple(np.random.uniform(0.0, 1.0, size=3))
+                else:
+                    color = (0.3, 0.3, 0.75)
+                scene_dict[f"bunny{i}"] = {
+                    "type": "ply",
+                    "filename": f"{ROOT_DIR}/scenes/meshes/bunny.ply",
+                    "to_world": T.translate([pos_x, pos_y, 0])
+                    .rotate([0, 1, 0], rot)
+                    .scale(5.0 / np.sqrt(self.nb_bunnies)),
+                    "bsdf": {
+                        "type": "diffuse",
+                        "reflectance": {"type": "rgb", "value": color},
+                    },
+                }
 
         return mi.load_dict(scene_dict)

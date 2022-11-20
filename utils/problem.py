@@ -34,4 +34,9 @@ class MitsubaProblem(ABC):
         self.set_params_from_vector(opt, x)
         self.apply_transformations(params, opt)
         image = mi.render(scene, params, seed=seed, spp=spp)
-        return image_to_bm(image)
+        return image, image_to_bm(image)
+
+    def render(self, spp, seed=0):
+        scene, params = self.initialize_scene()
+        image = mi.render(scene, params, seed=seed, spp=spp)
+        return image, image_to_bm(image)
