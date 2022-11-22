@@ -25,7 +25,7 @@ class MitsubaProblem(ABC):
     def initialize_scene(self):
         raise NotImplementedError
 
-    def _clip_vector(self, x):
+    def _clip_vector(self, x: np.ndarray) -> np.ndarray:
         return np.clip(x, self.problem.xl, self.problem.xu)
 
     def render_individual(self, x, spp, seed=0) -> mi.Bitmap:

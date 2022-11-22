@@ -52,14 +52,14 @@ class BOLeap:
         verbose=False,
     ):
         np.random.seed(seed)
-        nb_renders = 0
+        nb_renderings = 0
 
         def func_opt(x, opt=None, seed=0):
-            nonlocal nb_renders
+            nonlocal nb_renderings
             scene, params = self.mi_problem.initialize_scene()
 
             backward = opt is not None
-            if opt is None:
+            if not backward:
                 opt = {}
 
             self.mi_problem.set_params_from_vector(opt, x)
@@ -71,7 +71,7 @@ class BOLeap:
                 seed=seed,
                 spp=spp,
             )
-            nb_renders += 1
+            nb_renderings += 1
             loss = loss_fn(img)
 
             if backward:
@@ -86,10 +86,13 @@ class BOLeap:
             verbose=2,
             random_state=seed,
         )
+        seen_points = set()
 
         utility = UtilityFunction(kind="ucb", kappa=lcb_kappa, xi=lcb_xi)
 
         best_loss = np.inf
+        best_ind = None
+        losses = []
 
         progress_bar = tqdm(range(1, max_steps + 1), disable=not verbose)
         for step in progress_bar:
@@ -98,9 +101,13 @@ class BOLeap:
             cma_optimizer = CMA(
                 mean=x_step,
                 sigma=1.0,
+                bounds=np.stack(
+                    [self.mi_problem.problem.xl, self.mi_problem.problem.xu]
+                ).T,
                 population_size=pop_size,
                 seed=seed + step,
             )
+
             for local_step in range(local_steps):
                 x_local_step = np.zeros(
                     (cma_optimizer.population_size, x_step.shape[0])
@@ -108,26 +115,31 @@ class BOLeap:
                 loss_local_step = np.zeros(pop_size)
                 for i in range(cma_optimizer.population_size):
                     x = cma_optimizer.ask()
+                    x = self.mi_problem._clip_vector(x)
                     x_local_step[i, :] = x
                     loss_local_step[i] = func_opt(
                         x,
                         seed=seed + step * local_steps + local_step + i,
                     )
 
-                    best_loss = min(best_loss, loss_local_step[i])
+                    if loss_local_step[i] < best_loss:
+                        best_loss = loss_local_step[i]
+                        best_ind = x
                     progress_bar.set_description(
                         f"[Step. {step}/{max_steps}"
-                        f" Local step. {local_step}/{local_steps}"
+                        f" Local step. {local_step+1}/{local_steps}"
                         f" Ind. {i+1}/{pop_size}"
                         f"\tBest loss: {best_loss:.6f}"
-                        f"\tNb renderings: {nb_renders}"
+                        f"\tNb renderings: {nb_renderings}"
                     )
 
                     # add the new observation to the BO optimizer
-                    bo_optimizer.register(
-                        params=self._vector_to_bo_params(x),
-                        target=-loss_local_step[i],
-                    )
+                    if not x.tobytes() in seen_points:
+                        seen_points.add(x.tobytes())
+                        bo_optimizer.register(
+                            params=self._vector_to_bo_params(x),
+                            target=-loss_local_step[i],
+                        )
 
                 best_idx = np.argsort(loss_local_step)[:num_select_best]
                 x_mean = np.mean(x_local_step[best_idx], axis=0)
@@ -135,22 +147,32 @@ class BOLeap:
                 opt = mi.ad.Adam(lr=lr)
                 for i in range(1, nb_grad_steps + 1):
                     loss = func_opt(x_mean, opt=opt)
+                    losses.append(loss)
+                    if loss < best_loss:
+                        best_loss = loss
+                        best_ind = x_mean
                     self.mi_problem.set_vector_from_params(opt, x_mean)
                     x_mean = self.mi_problem._clip_vector(x_mean)
-                    bo_optimizer.register(
-                        params=self._vector_to_bo_params(x_mean), target=-loss
-                    )
+                    if not x_mean.tobytes() in seen_points:
+                        seen_points.add(x_mean.tobytes())
+                        bo_optimizer.register(
+                            params=self._vector_to_bo_params(x_mean),
+                            target=-loss,
+                        )
                     progress_bar.set_description(
                         f"[Step. {step}/{max_steps}"
-                        f" Local step. {local_step}/{local_steps}"
-                        f" Grad step. {i+1}/{nb_grad_steps}"
+                        f" Local step. {local_step+1}/{local_steps}"
+                        f" Grad step. {i}/{nb_grad_steps}"
                         f"\tBest loss: {best_loss:.6f}"
-                        f"\tNb renderings: {nb_renders}"
+                        f"\tNb renderings: {nb_renderings}"
                     )
 
                 # update CMA-ES parameters
                 # this operation is not clear in the paper
+                # use strategy in paper: "Combining Evolution Strategy and Gradient Descent Method for Discriminative Learning of Bayesian Classifiers"
+                cma_optimizer._mean = x_mean
                 cma_optimizer.tell(
                     [(x, l) for x, l in zip(x_local_step, loss_local_step)]
                 )
-                cma_optimizer._mean = x_mean
+
+        return best_ind, losses, nb_renderings
