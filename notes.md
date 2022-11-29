@@ -1,5 +1,10 @@
 # Notes
 
+- mc with gradient descent
+- use gradient information to see if a subset of parameters converged
+compute moments of the gradient -> variance in the current rendering setting
+-> augment the parameters?
+
 observations:
 
 - depending on the spp parameter, there exist sometimes converged parameters that have a better loss than the reference parameters
