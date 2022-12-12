@@ -1,5 +1,9 @@
 # Notes
 
+- calcul analytique pour vérifier le bon comportement du code de calcul de variance
+
+- variance utile pour avoir des informations locales sur létat de la convergence
+
 - mc with gradient descent
 - use gradient information to see if a subset of parameters converged
 compute moments of the gradient -> variance in the current rendering setting
